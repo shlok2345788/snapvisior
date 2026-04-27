@@ -32,7 +32,11 @@ export async function POST(req: NextRequest) {
 
     // Generate QR Code as DataURL (base64)
     // In production, you'd upload this to Cloudinary, but base64 works for a starter!
-    const galleryUrl = `${process.env.NEXT_PUBLIC_APP_URL}/gallery/${code}`;
+    const frontendUrl =
+      process.env.FRONTEND_URL ||
+      process.env.NEXT_PUBLIC_APP_URL ||
+      'http://localhost:3000';
+    const galleryUrl = `${frontendUrl.replace(/\/$/, '')}/gallery/${code}`;
     const qrCodeDataUrl = await QRCode.toDataURL(galleryUrl, {
         color: {
             dark: '#6366f1', // primary color

@@ -32,10 +32,18 @@ export async function verifyToken(token: string) {
 }
 
 export async function setAuthCookie(token: string, name: string = 'snapvior-token') {
+  const configuredSameSite = (process.env.COOKIE_SAME_SITE || '').toLowerCase();
+  const sameSite =
+    configuredSameSite === 'none' || configuredSameSite === 'lax' || configuredSameSite === 'strict'
+      ? (configuredSameSite as 'none' | 'lax' | 'strict')
+      : process.env.NODE_ENV === 'production' && !!process.env.CORS_ORIGIN
+        ? 'none'
+        : 'lax';
+
   (await cookies()).set(name, token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production' || sameSite === 'none',
+    sameSite,
     maxAge: 60 * 60 * 24, // 24 hours
     path: '/',
   });

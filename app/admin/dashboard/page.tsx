@@ -8,6 +8,7 @@ import {
   Search, RefreshCw
 } from 'lucide-react';
 import Link from 'next/link';
+import { apiFetch } from '@/lib/api-client';
 
 export default function AdminDashboard() {
   const [workers, setWorkers] = useState<any[]>([]);
@@ -19,7 +20,7 @@ export default function AdminDashboard() {
   useEffect(() => {
     const fetchWorkers = async () => {
       try {
-        const res = await fetch('/api/admin/workers');
+        const res = await apiFetch('/api/admin/workers');
         if (res.ok) {
           const data = await res.json();
           setWorkers(data);
@@ -38,7 +39,7 @@ export default function AdminDashboard() {
     setLoading(true);
     
     try {
-      const res = await fetch('/api/admin/workers', {
+      const res = await apiFetch('/api/admin/workers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newWorker),
@@ -153,10 +154,10 @@ export default function AdminDashboard() {
                              <td className="px-6 py-6 text-foreground/40 font-manrope text-sm">{worker.createdAt}</td>
                              <td className="px-6 py-6 text-right">
                                <div className="flex items-center justify-end gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                                  <button className="p-2 rounded-lg hover:bg-white/5 text-foreground/40 hover:text-white transition-colors">
+                                   <button title="Edit worker" aria-label="Edit worker" className="p-2 rounded-lg hover:bg-white/5 text-foreground/40 hover:text-white transition-colors">
                                      <Edit2 className="w-4 h-4" />
                                   </button>
-                                  <button className="p-2 rounded-lg hover:bg-red-500/10 text-foreground/40 hover:text-red-400 transition-colors">
+                                   <button title="Delete worker" aria-label="Delete worker" className="p-2 rounded-lg hover:bg-red-500/10 text-foreground/40 hover:text-red-400 transition-colors">
                                      <Trash2 className="w-4 h-4" />
                                   </button>
                                </div>
@@ -185,20 +186,24 @@ export default function AdminDashboard() {
               
               <form onSubmit={handleCreateWorker} className="space-y-6">
                  <div>
-                    <label className="text-xs font-bold text-white/40 uppercase tracking-widest pl-2 mb-2 block">Username</label>
+                    <label htmlFor="new-worker-username" className="text-xs font-bold text-white/40 uppercase tracking-widest pl-2 mb-2 block">Username</label>
                     <input 
+                      id="new-worker-username"
                       required
                       type="text" 
+                      placeholder="Enter worker username"
                       value={newWorker.username}
                       onChange={(e) => setNewWorker({ ...newWorker, username: e.target.value })}
                       className="w-full bg-white/5 border border-white/10 rounded-xl px-5 py-4 text-white font-manrope focus:outline-none focus:border-primary/50"
                     />
                  </div>
                  <div>
-                    <label className="text-xs font-bold text-white/40 uppercase tracking-widest pl-2 mb-2 block">Password</label>
+                    <label htmlFor="new-worker-password" className="text-xs font-bold text-white/40 uppercase tracking-widest pl-2 mb-2 block">Password</label>
                     <input 
+                      id="new-worker-password"
                       required
                       type="password" 
+                      placeholder="Enter secure password"
                       value={newWorker.password}
                       onChange={(e) => setNewWorker({ ...newWorker, password: e.target.value })}
                       className="w-full bg-white/5 border border-white/10 rounded-xl px-5 py-4 text-white font-manrope focus:outline-none focus:border-primary/50"

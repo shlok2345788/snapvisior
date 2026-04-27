@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sparkles, Mail, ShieldCheck, ArrowRight, Loader2 } from 'lucide-react';
 import Link from 'next/link';
+import { apiFetch } from '@/lib/api-client';
 
 export default function AdminLogin() {
   const [step, setStep] = useState(1); // 1: Credentials, 2: OTP
@@ -17,7 +18,7 @@ export default function AdminLogin() {
     setError('');
     
     try {
-      const res = await fetch('/api/auth/admin/otp', {
+      const res = await apiFetch('/api/auth/admin/otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: formData.username, email: formData.email }),
@@ -42,7 +43,7 @@ export default function AdminLogin() {
     setError('');
 
     try {
-      const res = await fetch('/api/auth/admin/verify', {
+      const res = await apiFetch('/api/auth/admin/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: formData.email, otp: formData.otp }),

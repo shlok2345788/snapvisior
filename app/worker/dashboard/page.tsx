@@ -7,6 +7,7 @@ import {
   LogOut, Check, Upload, 
   Clock, Trash2, Camera
 } from 'lucide-react';
+import { apiFetch } from '@/lib/api-client';
 
 interface WorkerEvent {
   id: string;
@@ -26,7 +27,7 @@ export default function WorkerDashboard() {
 
   const fetchEvents = async () => {
     try {
-      const res = await fetch('/api/worker/event');
+      const res = await apiFetch('/api/worker/event');
       if (res.ok) {
         const data = await res.json();
         setEvents(data);
@@ -49,7 +50,7 @@ export default function WorkerDashboard() {
     setUploading(true);
     
     try {
-      const res = await fetch('/api/worker/event', {
+      const res = await apiFetch('/api/worker/event', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: eventName }),
@@ -88,7 +89,7 @@ export default function WorkerDashboard() {
     });
 
     try {
-      const res = await fetch('/api/worker/upload', {
+      const res = await apiFetch('/api/worker/upload', {
         method: 'POST',
         body: formData
       });
@@ -119,7 +120,7 @@ export default function WorkerDashboard() {
 
     setDeletingEventId(eventId);
     try {
-      const res = await fetch(`/api/worker/event/${eventId}`, {
+      const res = await apiFetch(`/api/worker/event/${eventId}`, {
         method: 'DELETE',
       });
       

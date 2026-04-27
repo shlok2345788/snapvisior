@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { Camera, Sparkles, Download, User, X, Loader2, Search, CheckCircle2, RefreshCcw } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { apiFetch } from '@/lib/api-client';
 
 interface Media {
   id: string;
@@ -37,7 +38,7 @@ export default function GalleryClient({ eventCode, initialMedia }: GalleryClient
     formData.append('selfie', file);
 
     try {
-      const res = await fetch(`/api/gallery/${eventCode}/search`, {
+      const res = await apiFetch(`/api/gallery/${eventCode}/search`, {
         method: 'POST',
         body: formData,
       });

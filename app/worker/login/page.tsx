@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Camera, User, Lock, ArrowRight, Loader2 } from 'lucide-react';
 import Link from 'next/link';
+import { apiFetch } from '@/lib/api-client';
 
 export default function WorkerLogin() {
   const [loading, setLoading] = useState(false);
@@ -16,7 +17,7 @@ export default function WorkerLogin() {
     setError('');
     
     try {
-      const res = await fetch('/api/auth/worker/login', {
+      const res = await apiFetch('/api/auth/worker/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),

@@ -7,6 +7,7 @@ import {
   ExternalLink, Grid3X3, Download, RefreshCw
 } from 'lucide-react';
 import Link from 'next/link';
+import { apiFetch } from '@/lib/api-client';
 
 interface Media {
   id: string;
@@ -29,7 +30,7 @@ export default function EventManagementPage({ params }: { params: Promise<{ id: 
 
   const fetchEvent = async () => {
     try {
-      const res = await fetch(`/api/worker/event/${id}/details`);
+      const res = await apiFetch(`/api/worker/event/${id}/details`);
       if (res.ok) {
         const data = await res.json();
         setEvent(data);
@@ -50,7 +51,7 @@ export default function EventManagementPage({ params }: { params: Promise<{ id: 
     
     setDeletingId(mediaId);
     try {
-      const res = await fetch(`/api/worker/media/${mediaId}`, { method: 'DELETE' });
+      const res = await apiFetch(`/api/worker/media/${mediaId}`, { method: 'DELETE' });
       if (res.ok) {
         setEvent(prev => prev ? {
           ...prev,

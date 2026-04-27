@@ -1,26 +1,73 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #131317;
+  --foreground: #e4e1e7;
+  --primary: #cabeff;
+  --primary-container: #947dff;
+  --secondary: #a2e7ff;
+  --surface: #131317;
+  --surface-container-low: #1b1b1f;
+  --surface-container-high: #2a292e;
+  --surface-container-highest: #353439;
+  --outline-variant: rgba(72, 69, 85, 0.2);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+  --color-primary: var(--primary);
+  --color-primary-container: var(--primary-container);
+  --color-secondary: var(--secondary);
+  --color-surface: var(--surface);
+  --color-surface-container-low: var(--surface-container-low);
+  --color-surface-container-high: var(--surface-container-high);
+  --color-surface-container-highest: var(--surface-container-highest);
+  --color-outline-variant: var(--outline-variant);
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --font-inter: var(--font-inter);
+  --font-manrope: var(--font-manrope);
 }
 
 body {
-  background: var(--background);
+  background-color: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-manrope);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-inter);
+  font-weight: 700;
+}
+
+.glass {
+  background: rgba(53, 52, 57, 0.6);
+  -webkit-backdrop-filter: blur(24px);
+  backdrop-filter: blur(24px);
+  border: 1px solid var(--outline-variant);
+}
+
+.gradient-access {
+  background: linear-gradient(135deg, #947dff 0%, #60a5fa 100%);
+}
+
+.glow-primary {
+  box-shadow: 0 0 20px rgba(148, 125, 255, 0.3);
+}
+
+.glow-primary:hover {
+  box-shadow: 0 0 35px rgba(148, 125, 255, 0.5);
+}
+
+@layer utilities {
+  .section-padding {
+    padding-top: clamp(4rem, 10vh, 8rem);
+    padding-bottom: clamp(4rem, 10vh, 8rem);
+  }
 }

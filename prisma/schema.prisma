@@ -1,0 +1,62 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  username  String   @unique
+  email     String?  @unique
+  password  String?
+  role      Role     @default(WORKER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  events    Event[]  @relation("CreatedBy")
+}
+
+model Event {
+  id         String    @id @default(cuid())
+  name       String
+  code       String    @unique
+  qrCode     String?
+  userId     String
+  expiryDate DateTime?
+  status     String    @default("active")
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  createdBy  User      @relation("CreatedBy", fields: [userId], references: [id])
+  media      Media[]
+
+  @@index([code])
+}
+
+model Media {
+  id        String   @id @default(cuid())
+  url       String
+  publicId  String?
+  eventId   String
+  createdAt DateTime @default(now())
+  faces     Json?
+  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId])
+}
+
+model AdminOTP {
+  id        String   @id @default(cuid())
+  email     String
+  otp       String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([email])
+}
+
+enum Role {
+  ADMIN
+  WORKER
+}

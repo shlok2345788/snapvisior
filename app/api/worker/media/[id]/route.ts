@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { deleteCloudinaryAsset } from '@/lib/cloudinary';
+import { deleteB2Object } from '@/lib/b2';
 
 export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -15,12 +15,12 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
       return NextResponse.json({ message: 'Media not found' }, { status: 404 });
     }
 
-    // Delete from Cloudinary when available.
+    // Delete from Backblaze B2 when available.
     if (media.publicId) {
       try {
-        await deleteCloudinaryAsset(media.publicId);
+        await deleteB2Object(media.publicId);
       } catch {
-        console.error('Could not delete Cloudinary asset for media:', id);
+        console.error('Could not delete Backblaze B2 object for media:', id);
       }
     }
 

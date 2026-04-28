@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { deleteCloudinaryAssetsByPrefix } from '@/lib/cloudinary';
+import { deleteB2Object } from '@/lib/b2';
 
 export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -15,11 +15,20 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
       return NextResponse.json({ message: 'Event not found' }, { status: 404 });
     }
 
-    // Attempt to delete Cloudinary assets belonging to this event folder.
+    // Attempt to delete Backblaze B2 objects belonging to this event folder.
     try {
-      await deleteCloudinaryAssetsByPrefix(`snapvisor/events/${id}/`);
+      const mediaItems = await prisma.media.findMany({
+        where: { eventId: id },
+        select: { publicId: true },
+      });
+
+      await Promise.all(
+        mediaItems
+          .filter((item) => Boolean(item.publicId))
+          .map((item) => deleteB2Object(item.publicId as string))
+      );
     } catch {
-      console.error('Could not clean up Cloudinary files for event:', id);
+      console.error('Could not clean up Backblaze B2 objects for event:', id);
     }
 
     // Delete from database (Media will be deleted via Cascade)

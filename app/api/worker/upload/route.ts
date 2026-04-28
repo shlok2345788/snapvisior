@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { extractFaceEmbeddings } from '@/lib/ai';
-import { uploadImageBufferToCloudinary } from '@/lib/cloudinary';
+import { uploadImageBufferToB2 } from '@/lib/b2';
 
 
 export async function POST(req: Request) {
@@ -36,15 +36,15 @@ export async function POST(req: Request) {
         aiFailedCount++;
       }
       
-      // Upload to Cloudinary under event folder
-      const cloudinaryFolder = `snapvisor/events/${eventId}`;
-      const uploaded = await uploadImageBufferToCloudinary(buffer, cloudinaryFolder);
+      // Upload to Backblaze B2 under an event-scoped object key
+      const objectKey = `snapvisor/events/${eventId}/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+      const uploaded = await uploadImageBufferToB2(buffer, objectKey, file.type || 'image/jpeg');
       
       // Record in database
       await prisma.media.create({
         data: {
-          url: uploaded.secure_url,
-          publicId: uploaded.public_id,
+          url: uploaded.key,
+          publicId: uploaded.key,
           eventId: event.id,
           faces: faceEmbeddings.length > 0 ? faceEmbeddings : undefined
         }

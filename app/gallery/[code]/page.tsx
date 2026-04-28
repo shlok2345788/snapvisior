@@ -5,6 +5,7 @@ import { Prisma } from '@prisma/client';
 import { Footer } from '@/components/Footer';
 import { Camera, Grid3X3, ArrowLeft, WifiOff, CalendarDays, Image as ImageIcon } from 'lucide-react';
 import Link from 'next/link';
+import { getB2SignedReadUrl } from '@/lib/b2';
 
 interface GalleryPageProps {
   params: {
@@ -91,6 +92,13 @@ export default async function GalleryPage({ params }: GalleryPageProps) {
     notFound();
   }
 
+  const media = await Promise.all(
+    event.media.map(async (item) => ({
+      id: item.id,
+      url: await getB2SignedReadUrl(item.url),
+    }))
+  );
+
   return (
     <main className="min-h-screen bg-[#f9f3ea] text-[#1f1b16] selection:bg-[#ff6a3d]/20">
       <section className="relative overflow-hidden px-6 pb-12 pt-16">
@@ -147,7 +155,7 @@ export default async function GalleryPage({ params }: GalleryPageProps) {
                 </div>
              </div>
            ) : (
-             <GalleryClient eventCode={code} initialMedia={event.media.map(m => ({ id: m.id, url: m.url }))} />
+             <GalleryClient eventCode={code} initialMedia={media} />
            )}
         </div>
       </section>

@@ -31,7 +31,6 @@ export async function POST(req: NextRequest) {
     }
 
     // Generate QR Code as DataURL (base64)
-    // In production, you'd upload this to Cloudinary, but base64 works for a starter!
     const frontendUrl =
       process.env.FRONTEND_URL ||
       process.env.NEXT_PUBLIC_APP_URL ||

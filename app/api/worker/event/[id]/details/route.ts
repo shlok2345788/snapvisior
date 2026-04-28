@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { getB2SignedReadUrl } from '@/lib/b2';
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -20,7 +21,17 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       return NextResponse.json({ message: 'Event not found' }, { status: 404 });
     }
 
-    return NextResponse.json(event);
+    const signedEvent = {
+      ...event,
+      media: await Promise.all(
+        event.media.map(async (item) => ({
+          ...item,
+          url: await getB2SignedReadUrl(item.url),
+        }))
+      ),
+    };
+
+    return NextResponse.json(signedEvent);
   } catch (error) {
     console.error('Fetch Event Details API Error:', error);
     return NextResponse.json({ message: 'Server error' }, { status: 500 });

@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Plus, Image as ImageIcon, QrCode, Copy, 
   LogOut, Check, Upload, 
-  Clock, Trash2, Camera
+  Clock, Trash2, Camera, X
 } from 'lucide-react';
 import { apiFetch } from '@/lib/api-client';
 
@@ -16,12 +16,14 @@ interface WorkerEvent {
   code: string;
   createdAt: string;
   mediaCount: number;
+  qrCode?: string;
 }
 
 export default function WorkerDashboard() {
   const [events, setEvents] = useState<WorkerEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
+  const [shareEvent, setShareEvent] = useState<WorkerEvent | null>(null);
   const [eventName, setEventName] = useState('');
   const [uploading, setUploading] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
@@ -345,11 +347,7 @@ export default function WorkerDashboard() {
                              <Upload className="w-4 h-4" /> Upload
                           </label>
                           <button 
-                             onClick={() => {
-                                const url = `${window.location.origin}/gallery/${event.code}`;
-                                handleCopy(url);
-                                alert('Gallery URL copied to clipboard!');
-                             }}
+                             onClick={() => setShareEvent(event)}
                       className="flex items-center justify-center gap-2 rounded-xl border border-[#e7c9ab] bg-[#fff8ef] py-4 text-xs font-bold text-[#5d4634] transition-all hover:bg-[#ffefe0]"
                           >
                              <QrCode className="w-4 h-4" /> Share
@@ -414,6 +412,58 @@ export default function WorkerDashboard() {
                       </button>
                    </div>
                 </form>
+             </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+      {/* Share Event Modal */}
+      <AnimatePresence>
+        {shareEvent && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#2a1d12]/60 p-6 backdrop-blur-2xl">
+             <motion.div 
+               initial={{ scale: 0.9, opacity: 0, y: 20 }}
+               animate={{ scale: 1, opacity: 1, y: 0 }}
+               exit={{ scale: 0.9, opacity: 0, y: 20 }}
+               className="relative w-full max-w-md rounded-[2rem] border border-[#ecd3b8] bg-white p-10 shadow-2xl flex flex-col items-center text-center"
+             >
+                <button 
+                  onClick={() => setShareEvent(null)}
+                  className="absolute right-6 top-6 flex h-10 w-10 items-center justify-center rounded-full bg-[#fff0df] text-[#ff6a3d] hover:bg-[#ffe0c4] transition-colors"
+                >
+                   <X className="h-5 w-5" />
+                </button>
+                <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-[#fff0df]">
+                   <QrCode className="h-8 w-8 text-[#ff6a3d]" />
+                </div>
+                <h2 className="mb-2 text-3xl font-black">Share Event</h2>
+                <p className="mb-8 text-sm text-[#6e5744]">Have your customer scan this code to access {shareEvent.name}.</p>
+                
+                {shareEvent.qrCode ? (
+                  <div className="mb-8 rounded-[2rem] bg-white p-4 shadow-[0_10px_30px_rgba(90,60,30,0.1)] border border-[#ecd3b8]">
+                     <img src={shareEvent.qrCode} alt="Event QR Code" className="w-48 h-48" />
+                  </div>
+                ) : (
+                  <div className="mb-8 flex h-48 w-48 items-center justify-center rounded-[2rem] bg-gray-100 border border-[#ecd3b8]">
+                     <span className="text-sm text-gray-500">QR Code Unavailable</span>
+                  </div>
+                )}
+
+                <div className="w-full">
+                   <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.2em] text-[#8f7157]">Or share this link manually</p>
+                   <div className="flex w-full items-center justify-between rounded-2xl border border-[#e9d0b4] bg-[#fff9f2] p-4">
+                      <span className="truncate text-sm font-semibold text-[#2a1d12]">
+                         {`${window.location.origin}/gallery/${shareEvent.code}`}
+                      </span>
+                      <button 
+                         onClick={() => {
+                            handleCopy(`${window.location.origin}/gallery/${shareEvent.code}`);
+                         }}
+                         className="ml-4 rounded-xl bg-white p-2 shadow-sm border border-[#ecd3b8] hover:bg-[#fff0df] transition-colors"
+                      >
+                         {copied === shareEvent.code ? <Check className="h-4 w-4 text-[#0f8c70]" /> : <Copy className="h-4 w-4 text-[#ff6a3d]" />}
+                      </button>
+                   </div>
+                </div>
              </motion.div>
           </div>
         )}

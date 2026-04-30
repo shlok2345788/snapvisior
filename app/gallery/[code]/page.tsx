@@ -95,11 +95,13 @@ export default async function GalleryPage({ params }: GalleryPageProps) {
   const media = await Promise.all(
     event.media.map(async (item) => {
       let url = item.url;
-      try {
-        url = await getB2SignedReadUrl(item.url);
-      } catch (e) {
-        console.error(`Failed to generate signed URL for media ${item.id}:`, e);
-        // Fallback to the original URL or an empty string, preventing the whole page from crashing
+      if (!url.startsWith('http')) {
+        try {
+          url = await getB2SignedReadUrl(item.url);
+        } catch (e) {
+          console.error(`Failed to generate signed URL for media ${item.id}:`, e);
+          // Fallback to the original URL or an empty string, preventing the whole page from crashing
+        }
       }
       return {
         id: item.id,

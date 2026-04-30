@@ -1,9 +1,36 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { verifyToken } from '@/lib/auth';
+import fs from 'fs/promises';
+import path from 'path';
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  // Serve/normalize model manifest JSONs as arrays so tfjs/face-api doesn't crash
+  if (pathname.startsWith('/models/') && pathname.endsWith('weights_manifest.json')) {
+    try {
+      const rel = pathname.replace(/^\/models\//, '');
+      const full = path.join(process.cwd(), 'public', 'models', rel);
+      const data = await fs.readFile(full);
+      const text = data.toString('utf8');
+      try {
+        const parsed = JSON.parse(text);
+        const out = Array.isArray(parsed) ? parsed : [parsed];
+        return new NextResponse(JSON.stringify(out), {
+          status: 200,
+          headers: { 'content-type': 'application/json; charset=utf-8' },
+        });
+      } catch (e) {
+        return new NextResponse(text, {
+          status: 200,
+          headers: { 'content-type': 'application/json; charset=utf-8' },
+        });
+      }
+    } catch (err) {
+      return NextResponse.json({ error: 'not found' }, { status: 404 });
+    }
+  }
 
   if (pathname.startsWith('/api/')) {
     const origin = request.headers.get('origin') || '';
@@ -60,5 +87,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/api/:path*', '/admin/dashboard/:path*', '/worker/dashboard/:path*'],
+  matcher: ['/api/:path*', '/admin/dashboard/:path*', '/worker/dashboard/:path*', '/models/:path*'],
 };

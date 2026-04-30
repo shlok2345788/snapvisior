@@ -1,7 +1,25 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { extractFaceEmbeddings } from '@/lib/ai';
 import { uploadImageBufferToB2 } from '@/lib/b2';
+
+type UploadedFaceData = {
+  fileName: string;
+  descriptors: number[][];
+};
+
+function parseDescriptors(formData: FormData): UploadedFaceData[] {
+  const raw = formData.get('descriptors');
+  if (typeof raw !== 'string' || !raw) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as UploadedFaceData[];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
 
 
 export async function POST(req: Request) {
@@ -9,6 +27,7 @@ export async function POST(req: Request) {
     const formData = await req.formData();
     const eventId = formData.get('eventId') as string;
     const files = formData.getAll('files') as File[];
+    const descriptorItems = parseDescriptors(formData);
 
     if (!eventId || files.length === 0) {
       return NextResponse.json({ message: 'Missing event ID or files' }, { status: 400 });
@@ -20,25 +39,35 @@ export async function POST(req: Request) {
       return NextResponse.json({ message: 'Event not found' }, { status: 404 });
     }
 
-    let uploadedCount = 0;
-    let aiFailedCount = 0;
+    if (descriptorItems.length !== files.length) {
+      return NextResponse.json({ message: 'Face descriptors are required for every uploaded image.' }, { status: 400 });
+    }
 
-    for (const file of files) {
+    let uploadedCount = 0;
+
+    for (const [index, file] of files.entries()) {
       if (!file.name || !file.type.startsWith('image/')) continue;
+
+      const descriptorItem = descriptorItems[index];
+      if (!descriptorItem || !Array.isArray(descriptorItem.descriptors) || descriptorItem.descriptors.length === 0) {
+        return NextResponse.json({ message: `No face detected in ${file.name}. Please upload images with at least one visible face.` }, { status: 400 });
+      }
       
       const bytes = await file.arrayBuffer();
       const buffer = Buffer.from(bytes);
       
-      // AI Processing: Extract Face Embeddings
-      const embeddingResult = await extractFaceEmbeddings(buffer);
-      const faceEmbeddings = embeddingResult.error ? [] : embeddingResult.data;
-      if (embeddingResult.error) {
-        aiFailedCount++;
-      }
-      
       // Upload to Backblaze B2 under an event-scoped object key
       const objectKey = `snapvisor/events/${eventId}/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
-      const uploaded = await uploadImageBufferToB2(buffer, objectKey, file.type || 'image/jpeg');
+      let uploaded;
+      try {
+        uploaded = await uploadImageBufferToB2(buffer, objectKey, file.type || 'image/jpeg');
+      } catch (err: any) {
+        console.error('Upload API Error:', err);
+        if (err?.message && err.message.includes('Backblaze B2 bucket name is not configured')) {
+          return NextResponse.json({ message: 'Backblaze B2 is not configured on the server. Set B2 environment variables.' }, { status: 503 });
+        }
+        return NextResponse.json({ message: 'Failed to upload image to storage.' }, { status: 500 });
+      }
       
       // Record in database
       await prisma.media.create({
@@ -46,7 +75,7 @@ export async function POST(req: Request) {
           url: uploaded.key,
           publicId: uploaded.key,
           eventId: event.id,
-          faces: faceEmbeddings.length > 0 ? faceEmbeddings : undefined
+          faces: descriptorItem.descriptors,
         }
       });
       
@@ -55,12 +84,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       uploaded: uploadedCount,
-      aiProcessed: uploadedCount - aiFailedCount,
-      aiFailed: aiFailedCount,
-      message:
-        aiFailedCount > 0
-          ? 'Some photos uploaded without face embeddings because AI service was unavailable.'
-          : 'All photos uploaded and processed successfully.'
+      message: 'All photos uploaded successfully.'
     });
   } catch (error) {
     console.error('Upload API Error:', error);

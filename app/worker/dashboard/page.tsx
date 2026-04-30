@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import * as faceapi from 'face-api.js';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Plus, Image as ImageIcon, QrCode, Copy, 
@@ -24,6 +25,8 @@ export default function WorkerDashboard() {
   const [eventName, setEventName] = useState('');
   const [uploading, setUploading] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
+  const [modelsLoaded, setModelsLoaded] = useState(false);
+  const [modelsLoading, setModelsLoading] = useState(false);
 
   const fetchEvents = async () => {
     try {
@@ -41,6 +44,37 @@ export default function WorkerDashboard() {
 
   React.useEffect(() => {
     fetchEvents();
+  }, []);
+
+  React.useEffect(() => {
+    let cancelled = false;
+
+    async function loadModels() {
+      try {
+        setModelsLoading(true);
+        await Promise.all([
+          faceapi.nets.ssdMobilenetv1.loadFromUri('/models'),
+          faceapi.nets.faceLandmark68Net.loadFromUri('/models'),
+          faceapi.nets.faceRecognitionNet.loadFromUri('/models'),
+        ]);
+
+        if (!cancelled) {
+          setModelsLoaded(true);
+        }
+      } catch (error) {
+        console.error('Face model load failed:', error);
+      } finally {
+        if (!cancelled) {
+          setModelsLoading(false);
+        }
+      }
+    }
+
+    loadModels();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const [uploadingEventId, setUploadingEventId] = useState<string | null>(null);
@@ -77,16 +111,61 @@ export default function WorkerDashboard() {
     setTimeout(() => setCopied(null), 2000);
   };
 
+  async function extractDescriptorsFromFile(file: File) {
+    const imageUrl = URL.createObjectURL(file);
+    try {
+      const image = new Image();
+      image.src = imageUrl;
+      await new Promise<void>((resolve, reject) => {
+        image.onload = () => resolve();
+        image.onerror = () => reject(new Error(`Failed to load image ${file.name}`));
+      });
+
+      const detections = await faceapi
+        .detectAllFaces(image)
+        .withFaceLandmarks()
+        .withFaceDescriptors();
+
+      const descriptors = detections.map((d) => Array.from(d.descriptor));
+      if (descriptors.length === 0) {
+        throw new Error(`No face detected in ${file.name}`);
+      }
+
+      return descriptors;
+    } finally {
+      URL.revokeObjectURL(imageUrl);
+    }
+  }
+
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>, eventId: string) => {
     if (!e.target.files?.length) return;
+
+    if (!modelsLoaded) {
+      alert(modelsLoading ? 'Loading face recognition models. Please try again in a moment.' : 'Face recognition models are not ready yet. Check that /public/models exists.');
+      return;
+    }
     
     setUploadingEventId(eventId);
     const formData = new FormData();
     formData.append('eventId', eventId);
-    
-    Array.from(e.target.files).forEach(file => {
-      formData.append('files', file);
-    });
+
+    const files = Array.from(e.target.files);
+    const descriptorItems: Array<{ fileName: string; descriptors: number[][] }> = [];
+
+    try {
+      for (const file of files) {
+        if (!file.type.startsWith('image/')) continue;
+        const descriptors = await extractDescriptorsFromFile(file);
+        descriptorItems.push({ fileName: file.name, descriptors });
+        formData.append('files', file);
+      }
+
+      formData.append('descriptors', JSON.stringify(descriptorItems));
+    } catch (error: any) {
+      alert(error?.message || 'Unable to detect a face in one of the images.');
+      setUploadingEventId(null);
+      return;
+    }
 
     try {
       const res = await apiFetch('/api/worker/upload', {
@@ -97,12 +176,13 @@ export default function WorkerDashboard() {
       if (res.ok) {
         const result = await res.json();
         // Update the event media count visually
-        setEvents(events.map(ev => 
+        setEvents(prevEvents => prevEvents.map(ev => 
           ev.id === eventId ? { ...ev, mediaCount: ev.mediaCount + result.uploaded } : ev
         ));
         alert('Upload successful!');
       } else {
-        alert('Upload failed.');
+        const errorData = await res.json().catch(() => ({}));
+        alert(errorData.message || 'Upload failed.');
       }
     } catch {
       alert('Network error during upload');

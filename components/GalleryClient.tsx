@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import * as faceapi from 'face-api.js';
 import { Camera, Sparkles, Download, User, X, Loader2, Search, CheckCircle2, RefreshCcw } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { apiFetch } from '@/lib/api-client';
@@ -31,20 +32,142 @@ export default function GalleryClient({ eventCode, initialMedia }: GalleryClient
   const handleSelfieUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     setLoading(true);
     setSearchError(null);
-    const formData = new FormData();
-    formData.append('selfie', file);
 
     try {
-      const res = await apiFetch(`/api/gallery/${eventCode}/search`, {
+      // Monkeypatch fetch to normalize model manifests to arrays (required by tfjs)
+      const origFetch = (globalThis as any).fetch;
+      (globalThis as any).fetch = async (input: RequestInfo, init?: RequestInit) => {
+        const url = typeof input === 'string' ? input : (input as Request).url;
+        const isManifest = url && url.includes('/models') && url.endsWith('weights_manifest.json');
+        
+        const res = await origFetch(input, init);
+        
+        if (!isManifest) return res;
+        
+        try {
+          const text = await res.text();
+          const cleaned = text.replace(/^\uFEFF/, '');
+          
+          let parsed: any;
+          try {
+            parsed = JSON.parse(cleaned);
+          } catch (e) {
+            console.error('[fetch wrapper] Failed to parse manifest:', url, e);
+            return new Response(cleaned, { status: res.status, headers: res.headers });
+          }
+          
+          // Transform manifest to array format that tfjs expects
+          let manifest = parsed;
+          
+          if (Array.isArray(parsed)) {
+            console.debug('[fetch wrapper] Manifest already array:', url, 'items:', parsed.length);
+            // Already an array, use it
+            manifest = parsed;
+          } else if (parsed.weights && Array.isArray(parsed.weights)) {
+            console.warn('[fetch wrapper] Manifest has weights array, extracting:', url, 'weights:', parsed.weights.length);
+            // Object with weights array inside — extract it (tfjs expects the array directly)
+            manifest = parsed.weights;
+          } else if (!Array.isArray(parsed)) {
+            console.warn('[fetch wrapper] Manifest is plain object, wrapping to array:', url);
+            // Fallback: wrap the object in an array
+            manifest = [parsed];
+          } else {
+            manifest = parsed;
+          }
+          
+          const body = JSON.stringify(manifest);
+          const headers = new Headers(res.headers);
+          headers.set('content-type', 'application/json; charset=utf-8');
+          
+          console.debug('[fetch wrapper] Returning manifest (array):', url, 'length:', manifest.length);
+          return new Response(body, { status: 200, headers });
+        } catch (e) {
+          console.error('[fetch wrapper] Error processing manifest:', url, e);
+          return res;
+        }
+      };
+
+      // Validate model manifests are accessible
+      const manifests = [
+        '/models/ssd_mobilenetv1_model-weights_manifest.json',
+        '/models/face_landmark_68_model-weights_manifest.json',
+        '/models/face_recognition_model-weights_manifest.json',
+      ];
+
+      for (const m of manifests) {
+        try {
+          const r = await fetch(m);
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          const j = await r.json();
+          // After fetch wrapper, should always be array. Verify it.
+          if (!Array.isArray(j)) {
+            throw new Error(`Expected array, got ${typeof j}`);
+          }
+          console.debug('[models] Manifest array OK:', m, 'items:', j.length);
+        } catch (err) {
+          console.error('[models] Manifest fetch/parse failed:', m, err);
+          (globalThis as any).fetch = origFetch;
+          throw err;
+        }
+      }
+
+      // Load face-api models with detailed logging
+      try {
+        console.debug('[models] Loading ssdMobilenetv1...');
+        await faceapi.nets.ssdMobilenetv1.loadFromUri('/models');
+        console.debug('[models] ✓ ssdMobilenetv1 loaded');
+      } catch (err) {
+        console.error('[models] Failed to load ssdMobilenetv1', err);
+        (globalThis as any).fetch = origFetch;
+        throw err;
+      }
+
+      try {
+        console.debug('[models] Loading faceLandmark68Net...');
+        await faceapi.nets.faceLandmark68Net.loadFromUri('/models');
+        console.debug('[models] ✓ faceLandmark68Net loaded');
+      } catch (err) {
+        console.error('[models] Failed to load faceLandmark68Net', err);
+        (globalThis as any).fetch = origFetch;
+        throw err;
+      }
+
+      try {
+        console.debug('[models] Loading faceRecognitionNet...');
+        await faceapi.nets.faceRecognitionNet.loadFromUri('/models');
+        console.debug('[models] ✓ faceRecognitionNet loaded');
+      } catch (err) {
+        console.error('[models] Failed to load faceRecognitionNet', err);
+        (globalThis as any).fetch = origFetch;
+        throw err;
+      }
+
+      // Restore original fetch now that all models are loaded
+      (globalThis as any).fetch = origFetch;
+      console.debug('[models] ✓ All models loaded successfully');
+
+      const img = await faceapi.bufferToImage(file);
+      const single = await faceapi
+        .detectSingleFace(img, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.5 }))
+        .withFaceLandmarks()
+        .withFaceDescriptor();
+      if (!single || !single.descriptor) {
+        setSearchError('Unable to extract face descriptor.');
+        setLoading(false);
+        return;
+      }
+
+      const descriptorArr = Array.from(single.descriptor as Float32Array);
+
+      const res = await apiFetch('/api/match', {
         method: 'POST',
-        body: formData,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ eventCode, descriptor: descriptorArr }),
       });
 
       const data = await res.json();
-
       if (!res.ok) {
         setSearchError(data.message || 'Unable to search photos right now.');
         return;
@@ -60,7 +183,8 @@ export default function GalleryClient({ eventCode, initialMedia }: GalleryClient
       }, 100);
     } catch (error) {
       console.error('Search error:', error);
-      setSearchError('Network error while searching. Please try again.');
+      const msg = (error && (error as any).message) ? (error as any).message : String(error);
+      setSearchError(`Error while processing selfie: ${msg}`);
     } finally {
       setLoading(false);
     }
@@ -80,7 +204,7 @@ export default function GalleryClient({ eventCode, initialMedia }: GalleryClient
 
           <div className="flex items-center gap-3">
             <button
-              disabled
+              onClick={() => setShowModal(true)}
               className="group relative overflow-hidden rounded-full bg-[#d8c2aa] px-6 py-3 text-sm font-extrabold uppercase tracking-wide text-[#6b5544]"
             >
               <span className="relative z-10 inline-flex items-center gap-2">
@@ -187,8 +311,8 @@ export default function GalleryClient({ eventCode, initialMedia }: GalleryClient
               </div>
             ) : (
               <div className="columns-1 sm:columns-2 lg:columns-3 gap-6 space-y-6">
-                {matchedMedia.map((item) => (
-                   <div key={item.id} className="relative group break-inside-avoid overflow-hidden rounded-3xl border border-[#e9ceb4] bg-white shadow-[0_10px_30px_rgba(90,60,30,0.1)]">
+                 {matchedMedia.map((item, i) => (
+                   <div key={`matched-${item.id || i}`} className="relative group break-inside-avoid overflow-hidden rounded-3xl border border-[#e9ceb4] bg-white shadow-[0_10px_30px_rgba(90,60,30,0.1)]">
                       <img 
                         src={item.url} 
                         alt="Matched Content" 
@@ -218,8 +342,8 @@ export default function GalleryClient({ eventCode, initialMedia }: GalleryClient
       </AnimatePresence>
 
       <div className="columns-1 sm:columns-2 lg:columns-3 gap-6 space-y-6">
-        {initialMedia.map((item) => (
-              <div key={item.id} className="relative group break-inside-avoid overflow-hidden rounded-3xl border border-[#e9ceb4] bg-white shadow-[0_10px_30px_rgba(90,60,30,0.1)]">
+          {initialMedia.map((item, i) => (
+            <div key={`gallery-${item.id || i}`} className="relative group break-inside-avoid overflow-hidden rounded-3xl border border-[#e9ceb4] bg-white shadow-[0_10px_30px_rgba(90,60,30,0.1)]">
               <img 
                 src={item.url} 
                 alt="Gallery Content" 

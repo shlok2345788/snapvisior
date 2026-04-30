@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { QrCode, X, ArrowRight, Keyboard, Loader2 } from 'lucide-react';
+import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 
 interface AccessEventModalProps {
@@ -14,7 +15,10 @@ const AccessEventModal = ({ isOpen, onClose }: AccessEventModalProps) => {
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showScanner, setShowScanner] = useState(false);
   const router = useRouter();
+
+  const QrScanner = dynamic(() => import('./QrScanner'), { ssr: false });
 
   const handleAccess = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -72,7 +76,7 @@ const AccessEventModal = ({ isOpen, onClose }: AccessEventModalProps) => {
 
               <div className="space-y-6">
                 {/* QR Section */}
-                <div className="group cursor-pointer rounded-3xl border border-[#e7d4ba] bg-[#fff1e2] p-6 transition-all hover:border-[#ff6a3d] hover:bg-[#ffe8d6]">
+                <div onClick={() => setShowScanner(true)} className="group cursor-pointer rounded-3xl border border-[#e7d4ba] bg-[#fff1e2] p-6 transition-all hover:border-[#ff6a3d] hover:bg-[#ffe8d6]">
                   <div className="flex items-center gap-4">
                     <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#ff6a3d]/10 transition-colors group-hover:bg-[#ff6a3d]/20">
                       <QrCode className="h-6 w-6 text-[#ff6a3d]" />
@@ -132,6 +136,7 @@ const AccessEventModal = ({ isOpen, onClose }: AccessEventModalProps) => {
           </motion.div>
         </div>
       )}
+      {showScanner && <QrScanner onClose={() => setShowScanner(false)} />}
     </AnimatePresence>
   );
 };

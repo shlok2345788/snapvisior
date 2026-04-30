@@ -12,9 +12,20 @@ const endpoint = process.env.B2_ENDPOINT || 'https://s3.us-east-005.backblazeb2.
 const accessKeyId = process.env.B2_KEY_ID;
 const secretAccessKey = process.env.B2_APP_KEY;
 
-const hasB2Config = Boolean(bucketName && accessKeyId && secretAccessKey);
+const hasB2BucketConfig = Boolean(bucketName);
+const hasB2Credentials = Boolean(accessKeyId && secretAccessKey);
 
-if (!hasB2Config) {
+function assertB2Configured() {
+  if (!hasB2BucketConfig) {
+    throw new Error('Backblaze B2 bucket name is not configured. Set B2_BUCKET_NAME.');
+  }
+
+  if (!hasB2Credentials) {
+    throw new Error('Backblaze B2 credentials are not configured. Set B2_KEY_ID and B2_APP_KEY.');
+  }
+}
+
+if (!hasB2BucketConfig || !hasB2Credentials) {
   console.warn('Backblaze B2 environment variables are not fully configured.');
 }
 
@@ -29,9 +40,7 @@ const s3Client = new S3Client({
 });
 
 export async function uploadImageBufferToB2(buffer: Buffer, key: string, contentType = 'image/jpeg') {
-  if (!bucketName) {
-    throw new Error('Backblaze B2 bucket name is not configured');
-  }
+  assertB2Configured();
 
   await s3Client.send(
     new PutObjectCommand({
@@ -49,9 +58,7 @@ export async function uploadImageBufferToB2(buffer: Buffer, key: string, content
 }
 
 export async function getB2SignedReadUrl(key: string, expiresInSeconds = 60 * 60) {
-  if (!bucketName) {
-    throw new Error('Backblaze B2 bucket name is not configured');
-  }
+  assertB2Configured();
 
   return getSignedUrl(
     s3Client,
@@ -64,9 +71,7 @@ export async function getB2SignedReadUrl(key: string, expiresInSeconds = 60 * 60
 }
 
 export async function deleteB2Object(key: string) {
-  if (!bucketName) {
-    throw new Error('Backblaze B2 bucket name is not configured');
-  }
+  assertB2Configured();
 
   return s3Client.send(
     new DeleteObjectCommand({

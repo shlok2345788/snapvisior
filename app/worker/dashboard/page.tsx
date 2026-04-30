@@ -52,8 +52,41 @@ export default function WorkerDashboard() {
     let cancelled = false;
 
     async function loadModels() {
+      const origFetch = (globalThis as any).fetch;
       try {
         setModelsLoading(true);
+
+        // Monkeypatch fetch to normalize model manifests to arrays (required by tfjs)
+        (globalThis as any).fetch = async (input: RequestInfo, init?: RequestInit) => {
+          const url = typeof input === 'string' ? input : (input as Request).url;
+          const isManifest = url && url.includes('/models') && url.endsWith('weights_manifest.json');
+          
+          const res = await origFetch(input, init);
+          if (!isManifest) return res;
+          
+          try {
+            const text = await res.text();
+            const cleaned = text.replace(/^\uFEFF/, '');
+            const parsed = JSON.parse(cleaned);
+            
+            let manifest = parsed;
+            if (Array.isArray(parsed)) {
+              manifest = parsed;
+            } else if (parsed.weights && Array.isArray(parsed.weights)) {
+              manifest = parsed.weights;
+            } else if (!Array.isArray(parsed)) {
+              manifest = [parsed];
+            }
+            
+            const body = JSON.stringify(manifest);
+            const headers = new Headers(res.headers);
+            headers.set('content-type', 'application/json; charset=utf-8');
+            return new Response(body, { status: 200, headers });
+          } catch (e) {
+            return res;
+          }
+        };
+
         await Promise.all([
           faceapi.nets.ssdMobilenetv1.loadFromUri('/models'),
           faceapi.nets.faceLandmark68Net.loadFromUri('/models'),
@@ -66,6 +99,7 @@ export default function WorkerDashboard() {
       } catch (error) {
         console.error('Face model load failed:', error);
       } finally {
+        (globalThis as any).fetch = origFetch;
         if (!cancelled) {
           setModelsLoading(false);
         }

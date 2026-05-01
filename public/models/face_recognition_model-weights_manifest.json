@@ -1,4 +1,4 @@
-﻿{
+[{
     "weights":  [
                     {
                         "name":  "conv32_down/conv/filters",
@@ -1457,4 +1457,4 @@
                   "face_recognition_model-shard1",
                   "face_recognition_model-shard2"
               ]
-}
+}]

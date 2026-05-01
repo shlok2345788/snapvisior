@@ -1,4 +1,4 @@
-﻿{
+[{
     "weights":  [
                     {
                         "name":  "dense0/conv0/filters",
@@ -686,4 +686,4 @@
     "paths":  [
                   "face_landmark_68_model-shard1"
               ]
-}
+}]

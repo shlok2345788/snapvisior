@@ -24,6 +24,8 @@ function isDatabaseUnavailable(error: unknown): boolean {
   );
 }
 
+export const dynamic = 'force-dynamic';
+
 export default async function GalleryPage({ params }: GalleryPageProps) {
   const { code } = await params;
 
@@ -40,6 +42,7 @@ export default async function GalleryPage({ params }: GalleryPageProps) {
       },
     });
   } catch (error) {
+    console.error('Gallery DB Error:', error);
     if (isDatabaseUnavailable(error)) {
       dbUnavailable = true;
     } else {

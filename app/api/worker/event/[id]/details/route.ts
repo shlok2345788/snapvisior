@@ -2,10 +2,16 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getB2SignedReadUrl } from '@/lib/b2';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const { id } = await params;
-    console.log('API Request: Fetching details for event id:', id);
+    const paramsResolved = await params;
+    const id = paramsResolved.id.trim();
+    console.log('API Request: Fetching details for event id:', id, typeof id, id.length);
+
+    const allEvents = await prisma.event.findMany({ select: { id: true } });
+    console.log('All event IDs:', allEvents.map(e => e.id));
 
     const event = await prisma.event.findUnique({
       where: { id },

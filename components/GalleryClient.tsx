@@ -36,117 +36,25 @@ export default function GalleryClient({ eventCode, initialMedia }: GalleryClient
     setSearchError(null);
 
     try {
-      // Monkeypatch fetch to normalize model manifests to arrays (required by tfjs)
-      const origFetch = (globalThis as any).fetch;
-      (globalThis as any).fetch = async (input: RequestInfo, init?: RequestInit) => {
-        const url = typeof input === 'string' ? input : (input as Request).url;
-        const isManifest = url && url.includes('/models') && url.endsWith('weights_manifest.json');
-        
-        const res = await origFetch(input, init);
-        
-        if (!isManifest) return res;
-        
-        try {
-          const text = await res.text();
-          const cleaned = text.replace(/^\uFEFF/, '');
-          
-          let parsed: any;
-          try {
-            parsed = JSON.parse(cleaned);
-          } catch (e) {
-            console.error('[fetch wrapper] Failed to parse manifest:', url, e);
-            return new Response(cleaned, { status: res.status, headers: res.headers });
-          }
-          
-          // Transform manifest to array format that tfjs expects
-          let manifest = parsed;
-          
-          if (Array.isArray(parsed)) {
-            console.debug('[fetch wrapper] Manifest already array:', url, 'items:', parsed.length);
-            // Already an array, use it
-            manifest = parsed;
-          } else if (parsed.weights && Array.isArray(parsed.weights)) {
-            console.warn('[fetch wrapper] Manifest has weights array, extracting:', url, 'weights:', parsed.weights.length);
-            // Object with weights array inside — extract it (tfjs expects the array directly)
-            manifest = parsed.weights;
-          } else if (!Array.isArray(parsed)) {
-            console.warn('[fetch wrapper] Manifest is plain object, wrapping to array:', url);
-            // Fallback: wrap the object in an array
-            manifest = [parsed];
-          } else {
-            manifest = parsed;
-          }
-          
-          const body = JSON.stringify(manifest);
-          const headers = new Headers(res.headers);
-          headers.set('content-type', 'application/json; charset=utf-8');
-          
-          console.debug('[fetch wrapper] Returning manifest (array):', url, 'length:', manifest.length);
-          return new Response(body, { status: 200, headers });
-        } catch (e) {
-          console.error('[fetch wrapper] Error processing manifest:', url, e);
-          return res;
-        }
-      };
-
-      // Validate model manifests are accessible
-      const manifests = [
-        '/models/ssd_mobilenetv1_model-weights_manifest.json',
-        '/models/face_landmark_68_model-weights_manifest.json',
-        '/models/face_recognition_model-weights_manifest.json',
-      ];
-
-      for (const m of manifests) {
-        try {
-          const r = await fetch(m);
-          if (!r.ok) throw new Error(`HTTP ${r.status}`);
-          const j = await r.json();
-          // After fetch wrapper, should always be array. Verify it.
-          if (!Array.isArray(j)) {
-            throw new Error(`Expected array, got ${typeof j}`);
-          }
-          console.debug('[models] Manifest array OK:', m, 'items:', j.length);
-        } catch (err) {
-          console.error('[models] Manifest fetch/parse failed:', m, err);
-          (globalThis as any).fetch = origFetch;
-          throw err;
-        }
-      }
-
       // Load face-api models with detailed logging
       try {
         console.debug('[models] Loading ssdMobilenetv1...');
         await faceapi.nets.ssdMobilenetv1.loadFromUri('/models');
         console.debug('[models] ✓ ssdMobilenetv1 loaded');
-      } catch (err) {
-        console.error('[models] Failed to load ssdMobilenetv1', err);
-        (globalThis as any).fetch = origFetch;
-        throw err;
-      }
-
-      try {
+        
         console.debug('[models] Loading faceLandmark68Net...');
         await faceapi.nets.faceLandmark68Net.loadFromUri('/models');
         console.debug('[models] ✓ faceLandmark68Net loaded');
-      } catch (err) {
-        console.error('[models] Failed to load faceLandmark68Net', err);
-        (globalThis as any).fetch = origFetch;
-        throw err;
-      }
 
-      try {
         console.debug('[models] Loading faceRecognitionNet...');
         await faceapi.nets.faceRecognitionNet.loadFromUri('/models');
         console.debug('[models] ✓ faceRecognitionNet loaded');
+        
+        console.debug('[models] ✓ All models loaded successfully');
       } catch (err) {
-        console.error('[models] Failed to load faceRecognitionNet', err);
-        (globalThis as any).fetch = origFetch;
+        console.error('[models] Failed to load models', err);
         throw err;
       }
-
-      // Restore original fetch now that all models are loaded
-      (globalThis as any).fetch = origFetch;
-      console.debug('[models] ✓ All models loaded successfully');
 
       const img = await faceapi.bufferToImage(file);
       const single = await faceapi
@@ -249,6 +157,11 @@ export default function GalleryClient({ eventCode, initialMedia }: GalleryClient
               </div>
 
               <div className="space-y-4">
+                {searchError && (
+                  <div className="rounded-2xl bg-red-50 p-4 text-sm text-red-600 border border-red-100 mb-4">
+                    {searchError}
+                  </div>
+                )}
                 <label className="block">
                   <div className="relative cursor-pointer group">
                     <input 

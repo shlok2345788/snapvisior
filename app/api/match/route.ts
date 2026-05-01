@@ -18,33 +18,41 @@ function euclideanDistance(a: number[], b: number[]) {
 }
 
 export async function POST(req: Request) {
-  const body = (await req.json()) as Body;
+  try {
+    const body = (await req.json()) as Body;
 
-  if (!body || !body.eventCode || !Array.isArray(body.descriptor)) {
-    return NextResponse.json({ message: 'Invalid payload' }, { status: 400 });
-  }
+    if (!body || !body.eventCode || !Array.isArray(body.descriptor)) {
+      return NextResponse.json({ message: 'Invalid payload' }, { status: 400 });
+    }
 
-  const event = await prisma.event.findUnique({ where: { code: body.eventCode } });
-  if (!event) return NextResponse.json({ message: 'Event not found' }, { status: 404 });
+    const event = await prisma.event.findUnique({ where: { code: body.eventCode } });
+    if (!event) return NextResponse.json({ message: 'Event not found' }, { status: 404 });
 
-  const medias = await prisma.media.findMany({ where: { eventId: event.id } });
+    const medias = await prisma.media.findMany({ where: { eventId: event.id } });
 
-  const matches: Array<{ id: string; url: string; confidence: number }> = [];
+    const matches: Array<{ id: string; url: string; confidence: number }> = [];
 
-  for (const media of medias) {
-    if (!media.faces) continue;
-    // media.faces is stored as JSON: array of descriptor arrays
-    const descriptors = media.faces as unknown as number[][];
-    for (const stored of descriptors) {
-      const dist = euclideanDistance(stored, body.descriptor);
-      const confidence = Math.max(0, 1 - dist);
-      if (dist < 0.55) {
-        const url = await getB2SignedReadUrl(media.url);
-        matches.push({ id: media.id, url, confidence });
-        break; // once match found for this image, move to next image
+    for (const media of medias) {
+      if (!media.faces) continue;
+      // media.faces is stored as JSON: array of descriptor arrays
+      const descriptors = media.faces as unknown as number[][];
+      for (const stored of descriptors) {
+        const dist = euclideanDistance(stored, body.descriptor);
+        const confidence = Math.max(0, 1 - dist);
+        if (dist < 0.55) {
+          const url = await getB2SignedReadUrl(media.url);
+          matches.push({ id: media.id, url, confidence });
+          break; // once match found for this image, move to next image
+        }
       }
     }
-  }
 
-  return NextResponse.json({ matches });
+    return NextResponse.json({ matches });
+  } catch (error) {
+    console.error('Match API Error:', error);
+    return NextResponse.json(
+      { message: 'Internal Server Error', error: String(error) },
+      { status: 500 }
+    );
+  }
 }

@@ -70,6 +70,52 @@ export async function getB2SignedReadUrl(key: string, expiresInSeconds = 60 * 60
   );
 }
 
+export function getB2ObjectKeyFromStoredValue(storedValue: string): string | null {
+  const value = storedValue.trim();
+
+  if (!value) {
+    return null;
+  }
+
+  if (!/^https?:\/\//i.test(value)) {
+    return value;
+  }
+
+  try {
+    const parsed = new URL(value);
+    const pathname = decodeURIComponent(parsed.pathname).replace(/^\/+/, '');
+
+    if (!pathname) {
+      return null;
+    }
+
+    if (bucketName) {
+      const bucketPrefix = `${bucketName}/`;
+      if (pathname.startsWith(bucketPrefix)) {
+        return pathname.slice(bucketPrefix.length);
+      }
+    }
+
+    return pathname;
+  } catch {
+    return null;
+  }
+}
+
+export async function getB2SignedReadUrlFromStoredValue(storedValue: string, expiresInSeconds = 60 * 60) {
+  const objectKey = getB2ObjectKeyFromStoredValue(storedValue);
+
+  if (!objectKey) {
+    return storedValue;
+  }
+
+  if (/^https?:\/\//i.test(storedValue) && !storedValue.includes('backblazeb2.com')) {
+    return storedValue;
+  }
+
+  return getB2SignedReadUrl(objectKey, expiresInSeconds);
+}
+
 export async function deleteB2Object(key: string) {
   assertB2Configured();
 

@@ -5,7 +5,7 @@ import { Prisma } from '@prisma/client';
 import { Footer } from '@/components/Footer';
 import { Camera, Grid3X3, ArrowLeft, WifiOff, CalendarDays, Image as ImageIcon } from 'lucide-react';
 import Link from 'next/link';
-import { getB2SignedReadUrl } from '@/lib/b2';
+import { getB2SignedReadUrlFromStoredValue } from '@/lib/b2';
 
 interface GalleryPageProps {
   params: {
@@ -98,14 +98,14 @@ export default async function GalleryPage({ params }: GalleryPageProps) {
   const media = await Promise.all(
     event.media.map(async (item) => {
       let url = item.url;
-      if (!url.startsWith('http')) {
-        try {
-          url = await getB2SignedReadUrl(item.url);
-        } catch (e) {
-          console.error(`Failed to generate signed URL for media ${item.id}:`, e);
-          // Fallback to the original URL or an empty string, preventing the whole page from crashing
-        }
+
+      try {
+        url = await getB2SignedReadUrlFromStoredValue(item.url);
+      } catch (e) {
+        console.error(`Failed to generate signed URL for media ${item.id}:`, e);
+        // Fallback to the original URL or an empty string, preventing the whole page from crashing
       }
+
       return {
         id: item.id,
         url,

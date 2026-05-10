@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { getB2SignedReadUrl } from '@/lib/b2';
+import { getB2SignedReadUrlFromStoredValue } from '@/lib/b2';
 
 type Body = {
   eventCode: string;
@@ -40,7 +40,7 @@ export async function POST(req: Request) {
         const dist = euclideanDistance(stored, body.descriptor);
         const confidence = Math.max(0, 1 - dist);
         if (dist < 0.55) {
-          const url = await getB2SignedReadUrl(media.url);
+          const url = await getB2SignedReadUrlFromStoredValue(media.url);
           matches.push({ id: media.id, url, confidence });
           break; // once match found for this image, move to next image
         }

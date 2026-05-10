@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { getB2ObjectKeyFromStoredValue } from '@/lib/b2';
 
 type Body = {
   eventId: string;
@@ -19,7 +20,7 @@ export async function POST(req: Request) {
 
   const created = await prisma.media.create({
     data: {
-      url: body.imageUrl,
+      url: getB2ObjectKeyFromStoredValue(body.imageUrl) || body.imageUrl,
       eventId: body.eventId,
       faces: body.descriptors,
     },

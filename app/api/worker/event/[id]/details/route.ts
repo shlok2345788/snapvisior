@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { getB2SignedReadUrl } from '@/lib/b2';
+import { getB2SignedReadUrlFromStoredValue } from '@/lib/b2';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,7 +32,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       media: await Promise.all(
         event.media.map(async (item) => ({
           ...item,
-          url: await getB2SignedReadUrl(item.url),
+          url: await getB2SignedReadUrlFromStoredValue(item.url),
         }))
       ),
     };
